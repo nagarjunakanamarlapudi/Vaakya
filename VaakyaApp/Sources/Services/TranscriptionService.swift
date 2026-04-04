@@ -226,15 +226,26 @@ final class TranscriptionService {
         isTranscribingChunk = false
 
         // 1. Start mic capture via our own AVAudioEngine
-        try micCapture.startCapture()
+        var hasMic = false
+        do {
+            try micCapture.startCapture()
+            hasMic = true
+        } catch {
+            print("[TranscriptionService] Mic capture failed (no mic connected?), continuing with system audio only: \(error)")
+        }
 
         // 2. Start system audio capture via ScreenCaptureKit
+        var hasSystemAudio = false
         do {
             try await systemAudioCapture.startCapture()
-            print("[TranscriptionService] Chunk-based streaming: mic + system audio started")
+            hasSystemAudio = true
+            print("[TranscriptionService] Chunk-based streaming: \(hasMic ? "mic + " : "")system audio started")
         } catch {
-            print("[TranscriptionService] System audio capture failed, continuing with mic-only chunk mode: \(error)")
-            // Non-fatal: we still capture mic audio via chunk mode
+            print("[TranscriptionService] System audio capture failed: \(error)")
+        }
+
+        guard hasMic || hasSystemAudio else {
+            throw TranscriptionError.noAudioSource
         }
 
         isStreaming = true
@@ -742,11 +753,14 @@ final class TranscriptionService {
 
     enum TranscriptionError: Error, LocalizedError {
         case modelNotLoaded
+        case noAudioSource
 
         var errorDescription: String? {
             switch self {
             case .modelNotLoaded:
                 return "Whisper model not loaded. Download a model in Settings."
+            case .noAudioSource:
+                return "No audio source available. Connect a microphone or enable system audio capture in Settings."
             }
         }
     }
