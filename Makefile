@@ -71,10 +71,10 @@ app-fresh:                       ## Clean build + run (local backend)
 # ============================================================
 
 backend-run:                     ## Run backend locally (port 8002, MinIO)
-	VAAKYA_ENV=dev JWT_SECRET=dev-secret SHARE_SECRET=dev-share-secret uv run uvicorn vaakya.main:app --reload --port 8002
+	VAAKYA_ENV=dev SHARE_SECRET=dev-share-secret uv run uvicorn vaakya.main:app --reload --port 8002
 
 backend-test:                    ## Run backend tests
-	VAAKYA_ENV=dev JWT_SECRET=test-secret SHARE_SECRET=test-share-secret uv run pytest tests/ -v --tb=short
+	VAAKYA_ENV=dev SHARE_SECRET=test-share-secret uv run pytest tests/ -v --tb=short
 
 backend-lint:                    ## Lint + format backend code
 	uv run ruff check src/ tests/ --fix

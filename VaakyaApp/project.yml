@@ -13,15 +13,26 @@ packages:
   onnxruntime:
     url: https://github.com/microsoft/onnxruntime-swift-package-manager
     from: "1.17.0"
+  firebase-ios-sdk:
+    url: https://github.com/firebase/firebase-ios-sdk.git
+    from: "11.0.0"
 
 targets:
   Vaakya:
     type: application
     platform: [iOS, macOS]
+    info:
+      path: Sources/Resources/Info.plist
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLSchemes:
+              - com.googleusercontent.apps.300782895784-nvqvp3daoj5qko6q7st6rm79dhhd31bp
     sources:
       - path: Sources
         excludes:
           - Resources
+      - path: Sources/Resources/GoogleService-Info.plist
+        buildPhase: resources
     dependencies:
       - package: WhisperKit
         product: WhisperKit
@@ -29,8 +40,15 @@ targets:
         product: SpeakerKit
       - package: onnxruntime
         product: onnxruntime
+      - package: firebase-ios-sdk
+        product: FirebaseAuth
+      - package: firebase-ios-sdk
+        product: FirebaseCore
     entitlements:
       path: Sources/Resources/Vaakya.entitlements
+      properties:
+        keychain-access-groups:
+          - "$(AppIdentifierPrefix)ai.vaakya.app"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.vaakya.app
@@ -38,6 +56,7 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         CODE_SIGN_ENTITLEMENTS: Sources/Resources/Vaakya.entitlements
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: WBKK5SBPY7
         SWIFT_VERSION: "5.9"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Vaakya

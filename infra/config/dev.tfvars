@@ -1,5 +1,4 @@
 stage        = "dev"
 aws_region   = "us-east-1"
-jwt_secret   = "dev-secret-change-me"
 share_secret = "dev-share-secret-change-me"
 domain       = "vaakya.app"

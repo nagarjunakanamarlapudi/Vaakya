@@ -1,3 +1,4 @@
+import FirebaseCore
 import SwiftUI
 
 // Color palette is now in Theme/DesignTokens.swift
@@ -21,6 +22,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var keyMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        FirebaseApp.configure()
+
         // Check for --e2e flag
         if CommandLine.arguments.contains("--e2e") {
             Task { @MainActor in
@@ -443,6 +446,7 @@ struct VaakyaApp: App {
             }
             .preferredColorScheme(themeManager.resolvedColorScheme)
             .task {
+                FirebaseApp.configure()
                 await LocalStore.shared.initialize()
                 await auth.checkSession()
             }

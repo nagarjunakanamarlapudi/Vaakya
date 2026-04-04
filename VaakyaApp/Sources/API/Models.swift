@@ -2,22 +2,6 @@ import Foundation
 
 // MARK: - Auth
 
-struct OAuthLoginRequest: Codable, Sendable {
-    let provider: String
-    let identity_token: String
-    let name: String?
-}
-
-struct LoginResponse: Codable, Sendable {
-    let access_token: String
-    let refresh_token: String
-    let token_type: String?
-}
-
-struct RefreshRequest: Codable, Sendable {
-    let refresh_token: String
-}
-
 struct UserInfo: Codable, Sendable, Identifiable {
     let id: String
     let email: String

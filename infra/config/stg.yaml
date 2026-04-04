@@ -4,8 +4,6 @@ s3:
   region: us-east-1
 ai:
   provider: anthropic
-auth:
-  skip_verification: true  # TEMPORARY — for testing. Revert to false before real users.
 cors:
   origins:
     - "https://*.cloudfront.net"

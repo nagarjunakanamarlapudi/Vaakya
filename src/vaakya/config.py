@@ -66,38 +66,10 @@ class Settings:
     # Rate limiting
     rate_limiting_enabled: bool = _yaml.get("rate_limiting", {}).get("enabled", False)
 
-    # JWT (from SSM in prod, env var in dev)
-    jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 1440
-    jwt_refresh_expire_minutes: int = 10080
-
-    @property
-    def jwt_secret(self) -> str:
-        return os.getenv("JWT_SECRET", "") or _get_ssm_secret(f"/vaakya/{_stage}/jwt-secret")
-
+    # Share link JWT (still uses python-jose with separate secret)
     @property
     def share_secret(self) -> str:
         return os.getenv("SHARE_SECRET", "") or _get_ssm_secret(f"/vaakya/{_stage}/share-secret")
-
-    @property
-    def apple_team_id(self) -> str:
-        return _get_ssm_secret(f"/vaakya/{_stage}/apple-team-id")
-
-    @property
-    def apple_key_id(self) -> str:
-        return _get_ssm_secret(f"/vaakya/{_stage}/apple-key-id")
-
-    @property
-    def apple_private_key(self) -> str:
-        return _get_ssm_secret(f"/vaakya/{_stage}/apple-private-key")
-
-    @property
-    def apple_client_id(self) -> str:
-        return _get_ssm_secret(f"/vaakya/{_stage}/apple-client-id")
-
-    @property
-    def google_client_id(self) -> str:
-        return _get_ssm_secret(f"/vaakya/{_stage}/google-client-id")
 
 
 settings = Settings()

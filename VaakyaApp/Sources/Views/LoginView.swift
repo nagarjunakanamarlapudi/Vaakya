@@ -49,9 +49,7 @@ struct LoginView: View {
 
                     // Google Sign-In button
                     Button(action: {
-                        Task {
-                            await auth.signInWithGoogle()
-                        }
+                        auth.signInWithGoogle()
                     }) {
                         HStack(spacing: DesignTokens.Spacing.space3) {
                             // Google "G" logo placeholder

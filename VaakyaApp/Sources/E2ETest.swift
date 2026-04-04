@@ -1,4 +1,5 @@
 #if os(macOS)
+import FirebaseAuth
 import Foundation
 
 // Run with: swift run Vaakya --e2e
@@ -35,19 +36,20 @@ func runE2ETests() async {
         return
     }
 
-    // 2. Login (using OAuthLoginRequest format)
-    print("[2] OAuth Login (dev mode)")
-    var token: String = ""
-    var refreshToken: String = ""
+    // 2. Login (Firebase auth — uses current Firebase user)
+    print("[2] Firebase Auth Token")
     do {
-        let resp = try await api.login(provider: "google", identityToken: "e2e-swift-token", name: "Swift E2E")
-        token = resp.access_token
-        refreshToken = resp.refresh_token
-        check("Login returns access_token", !token.isEmpty)
-        check("Login returns refresh_token", !refreshToken.isEmpty)
-        check("Token type is bearer", resp.token_type == "bearer" || resp.token_type == nil)
+        guard let user = Auth.auth().currentUser else {
+            check("Firebase user signed in", false)
+            print("  No Firebase user. Sign in via the app first.")
+            print("\n=== ABORTED ===\n")
+            return
+        }
+        let firebaseToken = try await user.getIDToken()
+        api.setToken(firebaseToken)
+        check("Firebase token obtained", !firebaseToken.isEmpty)
     } catch {
-        check("Login succeeds", false)
+        check("Firebase auth succeeds", false)
         print("  Error: \(error)")
     }
 

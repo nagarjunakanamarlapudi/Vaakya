@@ -18,12 +18,6 @@ variable "aws_region" {
   description = "AWS region for all resources"
 }
 
-variable "jwt_secret" {
-  type        = string
-  sensitive   = true
-  description = "JWT signing key for auth tokens"
-}
-
 variable "share_secret" {
   type        = string
   sensitive   = true
@@ -31,35 +25,10 @@ variable "share_secret" {
   description = "JWT signing key for share link tokens"
 }
 
-variable "apple_team_id" {
+variable "firebase_project_id" {
   type        = string
-  default     = ""
-  description = "Apple Developer Team ID for Sign in with Apple"
-}
-
-variable "apple_key_id" {
-  type        = string
-  default     = ""
-  description = "Apple Sign-In key ID"
-}
-
-variable "apple_private_key" {
-  type        = string
-  sensitive   = true
-  default     = ""
-  description = "Apple Sign-In private key (PEM)"
-}
-
-variable "apple_client_id" {
-  type        = string
-  default     = ""
-  description = "Apple Sign-In client (service) ID"
-}
-
-variable "google_client_id" {
-  type        = string
-  default     = ""
-  description = "Google OAuth client ID"
+  default     = "vaakya-a5abf"
+  description = "Firebase project ID for JWT authorizer"
 }
 
 variable "domain" {

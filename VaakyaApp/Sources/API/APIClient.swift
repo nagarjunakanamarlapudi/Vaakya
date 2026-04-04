@@ -1,3 +1,4 @@
+import FirebaseAuth
 import Foundation
 
 enum APIError: Error, LocalizedError, Sendable {
@@ -30,7 +31,6 @@ actor APIClient {
     private let encoder: JSONEncoder
 
     private static let accessTokenKey = "access_token"
-    private static let refreshTokenKey = "refresh_token"
 
     /// Track whether a token refresh is already in flight to avoid concurrent refreshes.
     private var isRefreshing = false
@@ -56,14 +56,13 @@ actor APIClient {
         KeychainService.load(key: APIClient.accessTokenKey)
     }
 
-    nonisolated func setTokens(access: String, refresh: String) {
-        KeychainService.save(key: APIClient.accessTokenKey, value: access)
-        KeychainService.save(key: APIClient.refreshTokenKey, value: refresh)
+    nonisolated func setToken(_ token: String) {
+        KeychainService.save(key: APIClient.accessTokenKey, value: token)
     }
 
     nonisolated func clearTokens() {
         KeychainService.delete(key: APIClient.accessTokenKey)
-        KeychainService.delete(key: APIClient.refreshTokenKey)
+        // No more refresh token — Firebase manages it
     }
 
     // MARK: - Request Helpers
@@ -137,19 +136,10 @@ actor APIClient {
         isRefreshing = true
         defer { isRefreshing = false }
 
-        guard let refreshToken = KeychainService.load(key: APIClient.refreshTokenKey) else {
-            return false
-        }
-
+        guard let user = Auth.auth().currentUser else { return false }
         do {
-            let body = try encoder.encode(RefreshRequest(refresh_token: refreshToken))
-            let req = try buildRequest(path: "/auth/refresh", method: "POST", body: body, auth: false)
-            let (data, response) = try await session.data(for: req)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                return false
-            }
-            let loginResp = try decoder.decode(LoginResponse.self, from: data)
-            setTokens(access: loginResp.access_token, refresh: loginResp.refresh_token)
+            let newToken = try await user.getIDToken(forcingRefresh: true)
+            setToken(newToken)
             return true
         } catch {
             return false
@@ -157,29 +147,6 @@ actor APIClient {
     }
 
     // MARK: - Auth
-
-    func login(provider: String, identityToken: String, name: String?) async throws -> LoginResponse {
-        let body = try encoder.encode(OAuthLoginRequest(
-            provider: provider,
-            identity_token: identityToken,
-            name: name
-        ))
-        let req = try buildRequest(path: "/auth/login", method: "POST", body: body, auth: false)
-        let resp: LoginResponse = try await perform(req, allowRetry: false)
-        setTokens(access: resp.access_token, refresh: resp.refresh_token)
-        return resp
-    }
-
-    func refreshTokens() async throws -> LoginResponse {
-        guard let refreshToken = KeychainService.load(key: APIClient.refreshTokenKey) else {
-            throw APIError.unauthorized
-        }
-        let body = try encoder.encode(RefreshRequest(refresh_token: refreshToken))
-        let req = try buildRequest(path: "/auth/refresh", method: "POST", body: body, auth: false)
-        let resp: LoginResponse = try await perform(req, allowRetry: false)
-        setTokens(access: resp.access_token, refresh: resp.refresh_token)
-        return resp
-    }
 
     func fetchMe() async throws -> UserInfo {
         let req = try buildRequest(path: "/auth/me", method: "GET")

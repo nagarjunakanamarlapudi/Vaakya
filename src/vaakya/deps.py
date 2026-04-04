@@ -1,26 +1,36 @@
+import json
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Header
-from jose import JWTError, jwt
+from fastapi import Depends, HTTPException, Request
 
 from vaakya.config import settings
 
 
-async def get_current_user_id(authorization: Annotated[str, Header()] = "") -> str:
-    """Extract user ID from JWT Bearer token. No DB lookup -- stateless."""
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing auth token")
-    token = authorization[7:]
-    try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-        if payload.get("type") != "access":
-            raise HTTPException(status_code=401, detail="Invalid token type")
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        return user_id
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+async def get_current_user_id(request: Request) -> str:
+    """Extract user ID from Firebase JWT claims (verified by API Gateway or locally)."""
+    claims = await get_current_user_claims(request)
+    return claims.get("sub") or claims.get("user_id", "")
+
+
+async def get_current_user_claims(request: Request) -> dict:
+    """Extract Firebase JWT claims from API Gateway authorizer or dev-mode header."""
+    if settings.skip_verification:
+        return {"sub": "dev-user", "email": "dev@vaakya.app", "name": "Dev User"}
+
+    # Production: API Gateway JWT authorizer already verified the token.
+    # Claims are in the event context, passed through by Mangum.
+    event = request.scope.get("aws.event", {})
+    claims = (
+        event.get("requestContext", {})
+        .get("authorizer", {})
+        .get("jwt", {})
+        .get("claims", {})
+    )
+    if claims.get("sub") or claims.get("user_id"):
+        return claims
+
+    raise HTTPException(status_code=401, detail="Missing authentication")
 
 
 CurrentUserId = Annotated[str, Depends(get_current_user_id)]
+CurrentUserClaims = Annotated[dict, Depends(get_current_user_claims)]
