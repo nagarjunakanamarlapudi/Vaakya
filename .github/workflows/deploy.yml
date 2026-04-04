@@ -1,0 +1,68 @@
+name: Deploy API
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'Dockerfile.lambda', 'pyproject.toml']
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: vaakya-api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run ruff check src/ tests/
+
+      - name: Run tests
+        run: uv run pytest tests/ -v --tb=short
+        env:
+          JWT_SECRET: test-secret-key-not-for-production
+          SHARE_SECRET: test-share-secret
+          VAAKYA_ENV: test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        run: |
+          IMAGE=${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          docker build -f Dockerfile.lambda -t $IMAGE .
+          docker push $IMAGE
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Determine stage
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "STAGE=dev" >> $GITHUB_ENV
+          fi
+
+      - name: Update Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name vaakya-api-${{ env.STAGE }} \
+            --image-uri ${{ env.IMAGE }}

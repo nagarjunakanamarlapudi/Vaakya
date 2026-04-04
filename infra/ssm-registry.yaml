@@ -1,0 +1,84 @@
+# =============================================================================
+# SSM Parameter Registry for Vaakya
+# =============================================================================
+#
+# Single source of truth for all SSM parameters.
+# Run `make ssm-check` to validate references stay in sync.
+# Run `make ssm-list` to view current values in AWS.
+# Run `make ssm-seed-{stage}` to create missing parameters.
+#
+# {stage} is replaced with: dev, stg, prod
+#
+# Types:
+#   SecureString — secrets, set once, never in git
+#   String       — runtime config, changeable without redeploy
+
+# =============================================================================
+# SECRETS (SecureString)
+# =============================================================================
+secrets:
+  - path: /vaakya/{stage}/jwt-secret
+    type: SecureString
+    description: JWT signing key for auth tokens (64 hex chars)
+    used_by: config.py — settings.jwt_secret
+    generate: "openssl rand -hex 32"
+
+  - path: /vaakya/{stage}/share-secret
+    type: SecureString
+    description: JWT signing key for share link tokens (64 hex chars)
+    used_by: config.py — settings.share_secret
+    generate: "openssl rand -hex 32"
+
+  - path: /vaakya/{stage}/apple-team-id
+    type: SecureString
+    description: Apple Developer Team ID for Sign in with Apple
+    used_by: config.py — settings.apple_team_id
+
+  - path: /vaakya/{stage}/apple-key-id
+    type: SecureString
+    description: Apple Sign-In key ID
+    used_by: config.py — settings.apple_key_id
+
+  - path: /vaakya/{stage}/apple-private-key
+    type: SecureString
+    description: Apple Sign-In private key (PEM content)
+    used_by: config.py — settings.apple_private_key
+
+  - path: /vaakya/{stage}/apple-client-id
+    type: SecureString
+    description: Apple app bundle ID for Sign in with Apple
+    used_by: config.py — settings.apple_client_id
+
+  - path: /vaakya/{stage}/google-client-id
+    type: SecureString
+    description: Google OAuth client ID
+    used_by: config.py — settings.google_client_id
+
+  - path: /vaakya/{stage}/anthropic-api-key
+    type: SecureString
+    description: Anthropic API key for Platform AI (paid tier)
+    used_by: services/ai.py — platform AI routing
+    optional: true
+
+  - path: /vaakya/{stage}/openai-api-key
+    type: SecureString
+    description: OpenAI API key for Platform AI (paid tier)
+    used_by: services/ai.py — platform AI routing
+    optional: true
+
+# =============================================================================
+# RUNTIME CONFIG (String) — changeable without redeploy
+# =============================================================================
+config:
+  - path: /vaakya/{stage}/ai-provider
+    type: String
+    default: "anthropic"
+    description: "Default Platform AI provider: anthropic | openai"
+    used_by: config.py — settings.ai_provider
+
+  - path: /vaakya/{stage}/ai-model
+    type: String
+    default: "claude-sonnet-4-20250514"
+    description: AI model for Platform tier enhancement
+    used_by: services/ai.py
+    optional: true

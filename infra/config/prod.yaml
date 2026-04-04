@@ -1,0 +1,14 @@
+env: prod
+s3:
+  bucket: vaakya-data-prod
+  region: us-east-1
+ai:
+  provider: anthropic
+auth:
+  skip_verification: false
+cors:
+  origins:
+    - "https://vaakya.app"
+    - "https://*.cloudfront.net"
+rate_limiting:
+  enabled: true

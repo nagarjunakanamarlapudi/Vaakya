@@ -1,0 +1,14 @@
+env: stg
+s3:
+  bucket: vaakya-data-stg
+  region: us-east-1
+ai:
+  provider: anthropic
+auth:
+  skip_verification: true  # TEMPORARY — for testing. Revert to false before real users.
+cors:
+  origins:
+    - "https://*.cloudfront.net"
+    - "http://localhost:*"  # Allow app to connect during testing
+rate_limiting:
+  enabled: true

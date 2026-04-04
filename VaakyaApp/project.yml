@@ -1,0 +1,50 @@
+name: Vaakya
+options:
+  bundleIdPrefix: ai.vaakya
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+
+packages:
+  WhisperKit:
+    url: https://github.com/argmaxinc/WhisperKit.git
+    from: "0.18.0"
+  onnxruntime:
+    url: https://github.com/microsoft/onnxruntime-swift-package-manager
+    from: "1.17.0"
+
+targets:
+  Vaakya:
+    type: application
+    platform: [iOS, macOS]
+    sources:
+      - path: Sources
+        excludes:
+          - Resources
+    dependencies:
+      - package: WhisperKit
+        product: WhisperKit
+      - package: WhisperKit
+        product: SpeakerKit
+      - package: onnxruntime
+        product: onnxruntime
+    entitlements:
+      path: Sources/Resources/Vaakya.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.vaakya.app
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_ENTITLEMENTS: Sources/Resources/Vaakya.entitlements
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Vaakya
+        INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.productivity"
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "Vaakya needs microphone access to record and transcribe your meetings."
+        INFOPLIST_KEY_NSCalendarsUsageDescription: "Vaakya needs calendar access to detect upcoming meetings and auto-start recording."
+        INFOPLIST_KEY_NSScreenCaptureUsageDescription: "Vaakya captures system audio from calls (Zoom, Slack, Meet) for transcription. No screen content is recorded."
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"

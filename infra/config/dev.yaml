@@ -1,0 +1,19 @@
+env: dev
+s3:
+  bucket: vaakya-data-dev
+  region: us-east-1
+  # Dev is always local — use MinIO
+  endpoint_url: http://localhost:9010
+  access_key: minioadmin
+  secret_key: minioadmin
+ai:
+  provider: ollama
+  ollama_base_url: http://localhost:11434
+auth:
+  skip_verification: true
+cors:
+  origins:
+    - "http://localhost:*"
+    - "http://127.0.0.1:*"
+rate_limiting:
+  enabled: false

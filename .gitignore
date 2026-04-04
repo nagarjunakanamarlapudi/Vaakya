@@ -1,8 +1,41 @@
+# Python
 __pycache__/
 *.pyc
-.env.stg
-.env.prod
-.venv/
 *.egg-info/
 dist/
+.venv/
+
+# Environment (secrets)
+.env.stg
+.env.prod
+
+# Swift / Xcode
+.build/
+VaakyaApp/.build/
+VaakyaApp/build/
+VaakyaApp/Vaakya.app/
+VaakyaApp/Vaakya.xcodeproj/
+*.xcuserdata/
+DerivedData/
+*.xcworkspace/xcuserdata/
+
+# Generated at build time
+VaakyaApp/Sources/Config/BuildConfig.swift
+
+# Terraform
+infra/.terraform/
+infra/*.tfstate*
+infra/.terraform.lock.hcl
+infra/config/prod.tfvars
+infra/config/stg.tfvars
+
+# Brainstorming mockups
 .superpowers/
+
+# Misc
+uploads/
+.DS_Store
+*.swp
+VaakyaApp/.swiftpm/
+*.DS_Store
+.claude/worktrees/
