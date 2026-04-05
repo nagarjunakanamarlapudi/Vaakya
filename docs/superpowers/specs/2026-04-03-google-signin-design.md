@@ -1,40 +1,35 @@
 # Google Sign-In for Vaakya — Design Spec
 
-**Date:** 2026-04-03
-**Status:** Approved
+**Date:** 2026-04-03 (updated 2026-04-05)
+**Status:** Implemented
 
 ## Goal
 
-Replace the dev-mode placeholder (`skip_verification=true`, UUID as identity token) with real Google OAuth sign-in on both macOS and iOS using the Google Sign-In SDK.
+Replace the dev-mode placeholder (`skip_verification=true`, UUID as identity token) with real Google OAuth sign-in on both macOS and iOS, backed by Firebase Auth for user management.
 
 ## Approach
 
-Use the official **Google Sign-In SDK** (`google/GoogleSignIn-iOS`) via SPM. The SDK handles the OAuth flow, presents the Google login UI, and returns a Google ID token. That token is sent to the existing backend `POST /auth/login` endpoint, which verifies it against Google's tokeninfo API and issues a JWT session.
+**ASWebAuthenticationSession + PKCE** for the OAuth flow (Apple's native API, no third-party SDK). After obtaining Google tokens, sign into **Firebase Auth** with a credential — Firebase creates/manages the user and issues ID tokens. **API Gateway JWT Authorizer** verifies Firebase tokens at the gateway level — no auth code in Lambda.
 
-### Why SDK over manual OAuth
+### Why this approach
 
-- Officially supported by Google for iOS/macOS
-- Handles token refresh, account switching, revocation edge cases
-- ~30 lines of integration code vs ~150 for manual `ASWebAuthenticationSession` flow
-- Backend `verify_google_id_token` already expects the ID token format the SDK produces
+- GoogleSignIn-iOS SDK was incompatible with SPM executable builds (ObjC class loading crash)
+- Switched macOS builds from SPM to xcodegen + xcodebuild to support ObjC frameworks (Firebase SDK)
+- Firebase Auth gives: user dashboard, email dedup across providers, auto token refresh, path to Facebook + Phone OTP later
+- ASWebAuthenticationSession works on both macOS and iOS with zero dependencies
+- API Gateway JWT Authorizer verifies tokens natively — no auth code in Lambda
 
-## Google Cloud Console (manual setup)
+## Firebase Project
 
-**Project:** Vaakya (`vaakya-492304`, project number `646777782566`)
-
-### Already done
-- OAuth consent screen configured (External, Testing mode)
-- OAuth 2.0 Client ID (iOS type) created:
-  - **Client ID:** `646777782566-sca7f62gcuohtjngsr3o8den9nve8ko6.apps.googleusercontent.com`
-  - **Reversed Client ID (URL scheme):** `com.googleusercontent.apps.646777782566-sca7f62gcuohtjngsr3o8den9nve8ko6`
-  - **Bundle ID:** `ai.vaakya.app`
-
-### Still needed
-- Enable **Google Calendar API** in APIs & Services > Library
+- **Project ID:** `vaakya-a5abf`
+- **Project number:** `300782895784`
+- **OAuth Client ID:** `300782895784-nvqvp3daoj5qko6q7st6rm79dhhd31bp.apps.googleusercontent.com`
+- **Bundle ID:** `ai.vaakya.app`
+- **Auth providers enabled:** Google, Apple
 
 ## Scopes
 
-Requested at sign-in time via the SDK:
+Requested at sign-in time:
 - `openid` — identity verification
 - `email` — user's email address
 - `profile` — name and profile photo
@@ -44,89 +39,55 @@ Requested at sign-in time via the SDK:
 
 ```
 User taps "Sign In with Google"
-    → SDK shows Google login (in-app browser)
+    → ASWebAuthenticationSession opens Google OAuth (PKCE)
     → User authenticates with Google
-    → Google redirects back via URL scheme
-    → SDK returns GIDGoogleUser with idToken
-    → App sends idToken to POST /auth/login {provider: "google", identity_token: idToken}
-    → Backend calls Google tokeninfo, validates audience matches google_client_id
-    → Backend creates JWT (24h access, 7d refresh)
-    → App stores tokens in Keychain
-    → App calls GET /auth/me for user info
-    → User is logged in, sync starts
+    → Google redirects back via URL scheme with auth code
+    → App exchanges code for id_token + access_token (Google token endpoint)
+    → App creates GoogleAuthProvider.credential(withIDToken:accessToken:)
+    → Firebase Auth signs in with credential → creates/links user
+    → App gets Firebase ID token (auto-refreshed every ~55 min)
+    → App sends Firebase ID token as Bearer token to API
+    → API Gateway JWT Authorizer verifies (issuer: securetoken.google.com/vaakya-a5abf)
+    → Lambda reads claims from event.requestContext.authorizer.jwt.claims
+    → /auth/me returns user info (email, name, provider from Firebase claims)
 ```
 
-## Changes
+## Architecture
 
-### 1. Backend — AWS SSM
+### Client (Swift)
+- `AuthViewModel.swift` — ASWebAuthenticationSession + PKCE → Firebase credential sign-in
+- `APIClient.swift` — Bearer token from Firebase, auto-refresh via `getIDToken(forcingRefresh:)` on 401
+- `VaakyaApp.swift` — `FirebaseApp.configure()` in AppDelegate (macOS) / .task (iOS)
+- `GoogleService-Info.plist` — Firebase config (project vaakya-a5abf)
 
-Store real Google Client ID:
-```
-aws ssm put-parameter \
-  --name /vaakya/stg/google-client-id \
-  --value "646777782566-sca7f62gcuohtjngsr3o8den9nve8ko6.apps.googleusercontent.com" \
-  --type SecureString \
-  --profile vaakya-dev \
-  --region us-east-1
-```
+### Backend (Python)
+- `deps.py` — reads Firebase JWT claims from API Gateway authorizer context; dev mode uses `skip_verification`
+- `routers/auth.py` — only `/auth/me` endpoint; reads `sub`, `email`, `name`, `picture`, `firebase.sign_in_provider` from claims
+- `services/oauth.py` — **deleted** (Firebase handles verification)
 
-### 2. Backend — Config
+### Infrastructure (Terraform)
+- API Gateway JWT Authorizer: issuer `https://securetoken.google.com/vaakya-a5abf`, audience `vaakya-a5abf`
+- `$default` route requires JWT auth
+- Public routes (no auth): `GET /health`, `GET /share/{token}`
+- SSM: only `share-secret` and AI keys remain (auth secrets deleted)
 
-**File:** `infra/config/stg.yaml`
-- Set `skip_verification: false`
-- Keep `skip_verification: true` in `dev.yaml` for local development without Google credentials
+## Build System
 
-**No changes to `services/oauth.py`** — `verify_google_id_token` already works correctly. It calls Google's tokeninfo endpoint, checks audience matches `google_client_id`, and returns `{sub, email, name, avatar_url}`.
+macOS switched from `swift build` (SPM executable) to `xcodegen + xcodebuild`:
+- SPM executables can't load ObjC frameworks (Firebase SDK)
+- `project.yml` defines both iOS and macOS targets
+- `make build` runs `xcodegen generate && xcodebuild`
+- Proper code signing with Keychain Sharing entitlement (required by Firebase on macOS)
+- `DEVELOPMENT_TEAM: WBKK5SBPY7`
 
-### 3. Swift — Dependencies
+## Login Providers (Phased)
 
-Add `google/GoogleSignIn-iOS` SPM package to:
-- `Package.swift` (macOS builds)
-- `project.yml` (iOS builds via xcodegen)
-
-### 4. Swift — Info.plist / project.yml
-
-Add to Info.plist (both platforms):
-- **URL scheme:** `com.googleusercontent.apps.646777782566-sca7f62gcuohtjngsr3o8den9nve8ko6`
-- **GIDClientID:** `646777782566-sca7f62gcuohtjngsr3o8den9nve8ko6.apps.googleusercontent.com`
-
-For iOS, these are configured in `project.yml` which generates the Info.plist via xcodegen.
-
-### 5. Swift — AuthViewModel.swift
-
-Replace the UUID placeholder in `signInWithGoogle()` with real SDK flow:
-- Configure `GIDSignIn` with the client ID
-- Call `GIDSignIn.sharedInstance.signIn(withPresenting:)` with additional `calendar.readonly` scope
-- Extract `idToken` from `GIDSignInResult.user.idToken.tokenString`
-- Send to backend via existing `APIClient.login(provider: "google", identityToken: idToken)`
-- Handle errors (user cancelled, network failure, etc.)
-
-### 6. Swift — App Lifecycle (URL handling)
-
-Add `onOpenURL` handler to pass the OAuth callback URL to the SDK:
-```swift
-.onOpenURL { url in
-    GIDSignIn.sharedInstance.handle(url)
-}
-```
-
-This goes in the main app entry point (`VaakyaApp.swift` or equivalent) so the SDK can complete the OAuth redirect flow.
-
-## Files Modified
-
-| File | Change |
-|------|--------|
-| `infra/config/stg.yaml` | `skip_verification: false` |
-| `VaakyaApp/Package.swift` | Add GoogleSignIn-iOS dependency |
-| `VaakyaApp/project.yml` | Add GoogleSignIn-iOS dependency, URL scheme, GIDClientID |
-| `VaakyaApp/Sources/Resources/Info.plist` | URL scheme + GIDClientID (macOS) |
-| `VaakyaApp/Sources/ViewModels/AuthViewModel.swift` | Real Google Sign-In SDK flow |
-| `VaakyaApp/Sources/Views/LoginView.swift` | No changes (existing button is fine) |
-| `VaakyaApp/Sources/App/VaakyaApp.swift` (or equivalent) | `onOpenURL` handler |
+- **Phase 1 (done):** Google Sign-In
+- **Phase 2 (next):** Apple Sign-In (requires Apple Developer Program enrollment)
+- **Phase 3 (later):** Facebook, Phone + OTP
 
 ## Not in Scope
 
-- Calendar feature (pull meetings from Google Calendar) — scope is requested but feature deferred
-- Apple Sign-In — requires Apple Developer Program enrollment ($99/yr)
+- Calendar feature (pull meetings from Google Calendar) — scope requested but feature deferred
 - Production deployment — staying on dev/stg
-- Google consent screen verification / publishing — stays in Testing mode for now
+- Google consent screen verification / publishing — stays in Testing mode
