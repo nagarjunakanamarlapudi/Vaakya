@@ -271,7 +271,8 @@ struct ContextualSidebar: View {
             chatResponse = try await AIService.shared.chat(
                 transcript: doc.transcript,
                 message: text,
-                settings: settings
+                settings: settings,
+                language: settings.notesLanguage
             )
         } catch {
             errorMessage = error.localizedDescription

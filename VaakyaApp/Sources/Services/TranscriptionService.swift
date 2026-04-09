@@ -81,6 +81,16 @@ final class TranscriptionService {
         return docs
     }
 
+    private var transcriptionLanguage: String? {
+        let code = UserDefaults.standard.string(forKey: "vaakya_transcription_language") ?? "auto"
+        return code == "auto" ? nil : code
+    }
+
+    private var shouldDetectLanguage: Bool {
+        let code = UserDefaults.standard.string(forKey: "vaakya_transcription_language") ?? "auto"
+        return code == "auto"
+    }
+
     private var isLoadingModel = false
 
     /// Initialize WhisperKit with a specific model. Call once after model is downloaded.
@@ -289,7 +299,7 @@ final class TranscriptionService {
         let decodingOptions = DecodingOptions(
             verbose: false,
             task: .transcribe,
-            language: "en",
+            language: transcriptionLanguage,
             temperature: 0.0,
             temperatureIncrementOnFallback: 0.2,
             temperatureFallbackCount: 3,
@@ -297,7 +307,7 @@ final class TranscriptionService {
             topK: 5,
             usePrefillPrompt: true,
             usePrefillCache: true,
-            detectLanguage: false,
+            detectLanguage: shouldDetectLanguage,
             skipSpecialTokens: true,
             withoutTimestamps: false,
             wordTimestamps: false,
@@ -426,7 +436,7 @@ final class TranscriptionService {
             decodingOptions: DecodingOptions(
                 verbose: true,
                 task: .transcribe,
-                language: "en",
+                language: transcriptionLanguage,
                 temperature: 0.0,
                 temperatureIncrementOnFallback: 0.2,
                 temperatureFallbackCount: 3,
@@ -434,7 +444,7 @@ final class TranscriptionService {
                 topK: 5,
                 usePrefillPrompt: true,
                 usePrefillCache: true,
-                detectLanguage: false,
+                detectLanguage: shouldDetectLanguage,
                 skipSpecialTokens: true,
                 withoutTimestamps: false,
                 wordTimestamps: false,

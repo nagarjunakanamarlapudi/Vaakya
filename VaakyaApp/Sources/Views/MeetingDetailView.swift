@@ -20,6 +20,10 @@ struct MeetingDetailView: View {
     private var diarizationService: DiarizationService { DiarizationService.shared }
     @State private var showSpeakerMatching = false
     @State private var lastRecordingURL: URL?
+    @State private var selectedTranscriptLang: String = "original"
+    @State private var showTranscriptLangPicker: Bool = false
+    @State private var selectedNotesLang: String = "en"
+    @State private var showNotesLangPicker: Bool = false
 
     let recorder: AudioRecorder
 
@@ -48,13 +52,18 @@ struct MeetingDetailView: View {
         return Array(set).sorted()
     }
 
+    // Active blocks for the selected notes language
+    private var activeBlocks: [BlockData] {
+        meetingVM.selectedMeeting?.activeBlocks(language: selectedNotesLang) ?? []
+    }
+
     // Group blocks by type
-    private var summaryBlocks: [BlockData] { meetingVM.blocks.filter { $0.type.lowercased() == "summary" } }
-    private var decisionBlocks: [BlockData] { meetingVM.blocks.filter { $0.type.lowercased() == "decision" } }
-    private var actionBlocks: [BlockData] { meetingVM.blocks.filter { $0.type.lowercased() == "action" } }
-    private var quoteBlocks: [BlockData] { meetingVM.blocks.filter { $0.type.lowercased() == "quote" } }
+    private var summaryBlocks: [BlockData] { activeBlocks.filter { $0.type.lowercased() == "summary" } }
+    private var decisionBlocks: [BlockData] { activeBlocks.filter { $0.type.lowercased() == "decision" } }
+    private var actionBlocks: [BlockData] { activeBlocks.filter { $0.type.lowercased() == "action" } }
+    private var quoteBlocks: [BlockData] { activeBlocks.filter { $0.type.lowercased() == "quote" } }
     private var otherBlocks: [BlockData] {
-        meetingVM.blocks.filter {
+        activeBlocks.filter {
             let t = $0.type.lowercased()
             return t != "summary" && t != "decision" && t != "action" && t != "quote"
         }
@@ -104,7 +113,8 @@ struct MeetingDetailView: View {
                             }
 
                             headerButton(icon: "sparkles", label: "Enhance", color: recorder.isRecording ? Color.textTertiary : Color.accent, bgColor: Color.accent.opacity(0.10)) {
-                                Task { await meetingVM.enhanceMeeting(meetingId: meeting.id, userNotes: floatingNotes) }
+                                let settings = LocalStore.shared.loadSettings()
+                                Task { await meetingVM.enhanceMeeting(meetingId: meeting.id, userNotes: floatingNotes, language: settings.notesLanguage) }
                             }
                             .disabled(recorder.isRecording)
 
@@ -239,7 +249,7 @@ struct MeetingDetailView: View {
                                 .foregroundStyle(Color.textTertiary)
                         }
                         Spacer()
-                    } else if meetingVM.blocks.isEmpty {
+                    } else if activeBlocks.isEmpty {
                         Spacer()
                         EmptyStateView(
                             icon: "sparkles",
@@ -247,13 +257,16 @@ struct MeetingDetailView: View {
                             subtitle: "Click Enhance to create structured notes",
                             actionLabel: "Enhance Notes",
                             action: {
-                                Task { await meetingVM.enhanceMeeting(meetingId: meeting.id, userNotes: floatingNotes) }
+                                let settings = LocalStore.shared.loadSettings()
+                                Task { await meetingVM.enhanceMeeting(meetingId: meeting.id, userNotes: floatingNotes, language: settings.notesLanguage) }
                             }
                         )
                         Spacer()
                     } else {
                         ScrollView {
                             VStack(alignment: .leading, spacing: DesignTokens.Spacing.space2) {
+                                notesLanguageToggle(meeting: meeting)
+
                                 ForEach(summaryBlocks) { block in blockRow(block, meetingId: meeting.id) }
 
                                 if !decisionBlocks.isEmpty {
@@ -322,30 +335,54 @@ struct MeetingDetailView: View {
             if let meeting = meetingVM.selectedMeeting {
                 if showTranscript {
                     Divider().opacity(0.5)
-                    if meetingVM.isStreamingTranscription {
-                        LiveTranscriptView(
-                            transcriptionService: meetingVM.transcriptionService
-                        )
-                        .transition(.move(edge: .trailing))
-                    } else {
-                        // Build transcript text from stored segments or live service
-                        let transcriptText: String = {
-                            let liveText = meetingVM.transcriptionService.transcriptText()
-                            if !liveText.isEmpty { return liveText }
-                            // Build from stored TranscriptSegmentData
-                            return meeting.transcript.map { seg in
+                    VStack(spacing: 0) {
+                        if !meetingVM.isStreamingTranscription {
+                            transcriptLanguageToggle(meeting: meeting)
+                            Divider().opacity(0.3)
+                        }
+                        if meetingVM.isStreamingTranscription {
+                            LiveTranscriptView(
+                                transcriptionService: meetingVM.transcriptionService
+                            )
+                        } else if meetingVM.isTranslating {
+                            VStack(spacing: 8) {
+                                ProgressView()
+                                Text("Translating...")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            // Build transcript text from stored segments or live service
+                            let segments: [TranscriptSegmentData] = {
+                                if selectedTranscriptLang == "original" {
+                                    let liveSegs = meetingVM.transcriptionService.segments
+                                    if !liveSegs.isEmpty {
+                                        return liveSegs.map { seg in
+                                            TranscriptSegmentData(
+                                                start: seg.start, end: seg.end,
+                                                text: seg.text, speaker: seg.speaker,
+                                                isConfirmed: seg.isConfirmed
+                                            )
+                                        }
+                                    }
+                                    return meeting.transcript
+                                }
+                                return meeting.translatedTranscripts[selectedTranscriptLang] ?? meeting.transcript
+                            }()
+                            let transcriptText = segments.map { seg in
                                 let speaker = seg.speaker.map { "[\($0)] " } ?? ""
                                 return "[\(seg.startFormatted)] \(speaker)\(seg.text)"
                             }.joined(separator: "\n")
-                        }()
-                        TranscriptView(
-                            transcript: transcriptText,
-                            meetingId: meeting.id,
-                            blocks: meetingVM.blocks,
-                            diarizationSpeakers: diarizationSpeakers
-                        )
-                        .transition(.move(edge: .trailing))
+                            TranscriptView(
+                                transcript: transcriptText,
+                                meetingId: meeting.id,
+                                blocks: meetingVM.blocks,
+                                diarizationSpeakers: diarizationSpeakers
+                            )
+                        }
                     }
+                    .transition(.move(edge: .trailing))
                 }
 
                 Divider().opacity(0.5)
@@ -378,13 +415,21 @@ struct MeetingDetailView: View {
         }
         .onChange(of: meetingVM.enhanceRequest) { _, _ in
             if let meeting = meetingVM.selectedMeeting {
-                Task { await meetingVM.enhanceMeeting(meetingId: meeting.id, userNotes: floatingNotes) }
+                let settings = LocalStore.shared.loadSettings()
+                Task { await meetingVM.enhanceMeeting(meetingId: meeting.id, userNotes: floatingNotes, language: settings.notesLanguage) }
             }
+        }
+        .onChange(of: meetingVM.selectedMeeting?.id) { _, _ in
+            if let lang = meetingVM.selectedMeeting?.notesLanguage {
+                selectedNotesLang = lang
+            }
+            selectedTranscriptLang = "original"
         }
         .alert("Regenerate AI Notes", isPresented: $showRegenerateConfirm) {
             Button("Regenerate", role: .destructive) {
                 if let meeting = meetingVM.selectedMeeting {
-                    Task { await meetingVM.enhanceMeeting(meetingId: meeting.id, userNotes: floatingNotes) }
+                    let settings = LocalStore.shared.loadSettings()
+                    Task { await meetingVM.enhanceMeeting(meetingId: meeting.id, userNotes: floatingNotes, language: settings.notesLanguage) }
                 }
             }
             Button("Cancel", role: .cancel) {}
@@ -533,7 +578,8 @@ struct MeetingDetailView: View {
                 }
 
                 if meetingVM.transcriptionComplete {
-                    await meetingVM.enhanceMeeting(meetingId: meeting.id, userNotes: notes)
+                    let settings = LocalStore.shared.loadSettings()
+                    await meetingVM.enhanceMeeting(meetingId: meeting.id, userNotes: notes, language: settings.notesLanguage)
                 }
             }
         }
@@ -580,6 +626,119 @@ struct MeetingDetailView: View {
             expandFromPanel()
         } else {
             minimizeToPanel()
+        }
+    }
+
+    // MARK: - Language Toggles
+
+    private func langTab(_ title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? Color.accent : Color.textSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 6).fill(isSelected ? Color.accent.opacity(0.12) : Color.clear))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func transcriptLanguageToggle(meeting: MeetingDocument) -> some View {
+        HStack(spacing: 4) {
+            // "Original" tab -- always present
+            langTab("Original", isSelected: selectedTranscriptLang == "original") {
+                selectedTranscriptLang = "original"
+            }
+
+            // Translated language tabs
+            ForEach(meeting.availableTranscriptLanguages, id: \.self) { langCode in
+                let name = TranscriptionLanguage(rawValue: langCode)?.displayName ?? langCode
+                langTab(name, isSelected: selectedTranscriptLang == langCode) {
+                    selectedTranscriptLang = langCode
+                }
+            }
+
+            // "+" button to add translation
+            Button(action: { showTranscriptLangPicker = true }) {
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.textSecondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.bgCard))
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $showTranscriptLangPicker) {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(TranscriptionLanguage.allCases.filter { $0 != .auto }, id: \.self) { lang in
+                        if !meeting.availableTranscriptLanguages.contains(lang.code) && lang.code != "original" {
+                            Button(lang.displayName) {
+                                showTranscriptLangPicker = false
+                                Task {
+                                    await meetingVM.translateTranscript(meetingId: meeting.id, targetLanguage: lang.code)
+                                    selectedTranscriptLang = lang.code
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                        }
+                    }
+                }
+                .padding(8)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
+    @ViewBuilder
+    private func notesLanguageToggle(meeting: MeetingDocument) -> some View {
+        if !meeting.availableNotesLanguages.isEmpty {
+            HStack(spacing: 4) {
+                ForEach(meeting.availableNotesLanguages, id: \.self) { langCode in
+                    let name = TranscriptionLanguage(rawValue: langCode)?.displayName ?? langCode
+                    langTab(name, isSelected: selectedNotesLang == langCode) {
+                        selectedNotesLang = langCode
+                    }
+                }
+
+                Button(action: { showNotesLangPicker = true }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.textSecondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.bgCard))
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showNotesLangPicker) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(TranscriptionLanguage.allCases.filter { $0 != .auto }, id: \.self) { lang in
+                            if !meeting.availableNotesLanguages.contains(lang.code) {
+                                Button(lang.displayName) {
+                                    showNotesLangPicker = false
+                                    Task {
+                                        await meetingVM.enhanceMeeting(meetingId: meeting.id, language: lang.code)
+                                        selectedNotesLang = lang.code
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                            }
+                        }
+                    }
+                    .padding(8)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, DesignTokens.Block.padding)
+            .padding(.vertical, 6)
         }
     }
 

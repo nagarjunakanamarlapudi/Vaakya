@@ -19,7 +19,10 @@ struct MeetingDocument: Codable, Identifiable, Sendable {
     var userNotes: String
 
     var transcript: [TranscriptSegmentData]
-    var blocks: [BlockData]
+    var blocks: [BlockData]                                          // keep for backward compat
+    var translatedTranscripts: [String: [TranscriptSegmentData]]     // NEW
+    var enhancedBlocks: [String: [BlockData]]                        // NEW
+    var notesLanguage: String?                                        // NEW
     var speakers: [SpeakerData]
 
     init(id: String = UUID().uuidString, title: String, startedAt: Date = Date()) {
@@ -38,7 +41,70 @@ struct MeetingDocument: Codable, Identifiable, Sendable {
         self.userNotes = ""
         self.transcript = []
         self.blocks = []
+        self.translatedTranscripts = [:]
+        self.enhancedBlocks = [:]
+        self.notesLanguage = nil
         self.speakers = []
+    }
+}
+
+extension MeetingDocument {
+    enum CodingKeys: String, CodingKey {
+        case id, title, startedAt, endedAt, durationSeconds, speakerCount, source
+        case participants, template, aiProvider, isEnhanced, lastModified, userNotes
+        case transcript, blocks, translatedTranscripts, enhancedBlocks, notesLanguage, speakers
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        startedAt = try c.decode(Date.self, forKey: .startedAt)
+        endedAt = try c.decodeIfPresent(Date.self, forKey: .endedAt)
+        durationSeconds = try c.decodeIfPresent(Int.self, forKey: .durationSeconds)
+        speakerCount = try c.decodeIfPresent(Int.self, forKey: .speakerCount) ?? 0
+        source = try c.decodeIfPresent(String.self, forKey: .source)
+        participants = try c.decodeIfPresent([Participant].self, forKey: .participants)
+        template = try c.decodeIfPresent(String.self, forKey: .template)
+        aiProvider = try c.decodeIfPresent(String.self, forKey: .aiProvider)
+        isEnhanced = try c.decodeIfPresent(Bool.self, forKey: .isEnhanced) ?? false
+        lastModified = try c.decodeIfPresent(Date.self, forKey: .lastModified) ?? Date()
+        userNotes = try c.decodeIfPresent(String.self, forKey: .userNotes) ?? ""
+        transcript = try c.decodeIfPresent([TranscriptSegmentData].self, forKey: .transcript) ?? []
+        blocks = try c.decodeIfPresent([BlockData].self, forKey: .blocks) ?? []
+        speakers = try c.decodeIfPresent([SpeakerData].self, forKey: .speakers) ?? []
+
+        // New fields with migration
+        translatedTranscripts = try c.decodeIfPresent([String: [TranscriptSegmentData]].self, forKey: .translatedTranscripts) ?? [:]
+        notesLanguage = try c.decodeIfPresent(String.self, forKey: .notesLanguage)
+
+        // Migrate: if old `blocks` exist but no `enhancedBlocks`, move them to enhancedBlocks["en"]
+        let decoded = try c.decodeIfPresent([String: [BlockData]].self, forKey: .enhancedBlocks)
+        if let decoded, !decoded.isEmpty {
+            enhancedBlocks = decoded
+        } else if !blocks.isEmpty {
+            enhancedBlocks = ["en": blocks]
+        } else {
+            enhancedBlocks = [:]
+        }
+    }
+}
+
+extension MeetingDocument {
+    /// Get blocks for the active notes language, falling back to the legacy `blocks` array.
+    func activeBlocks(language: String? = nil) -> [BlockData] {
+        let lang = language ?? notesLanguage ?? "en"
+        return enhancedBlocks[lang] ?? blocks
+    }
+
+    /// Languages that have enhanced notes available.
+    var availableNotesLanguages: [String] {
+        Array(enhancedBlocks.keys).sorted()
+    }
+
+    /// Languages that have transcript translations available.
+    var availableTranscriptLanguages: [String] {
+        Array(translatedTranscripts.keys).sorted()
     }
 }
 
@@ -90,9 +156,10 @@ struct MeetingMetadata: Codable, Identifiable, Hashable, Sendable {
     static func from(_ doc: MeetingDocument, hasAudio: Bool = false,
                      isPinned: Bool = false, pinSortOrder: Int? = nil,
                      project: String? = nil, tags: [String] = []) -> MeetingMetadata {
-        let blockCounts = Dictionary(grouping: doc.blocks, by: \.type)
+        let activeBlocks = doc.activeBlocks()
+        let blockCounts = Dictionary(grouping: activeBlocks, by: \.type)
             .mapValues { $0.count }
-        let pending = doc.blocks.filter { $0.type == "action" && !$0.isChecked }.count
+        let pending = activeBlocks.filter { $0.type == "action" && !$0.isChecked }.count
         return MeetingMetadata(
             id: doc.id,
             title: doc.title,
@@ -254,6 +321,7 @@ struct LocalSettings: Codable {
     var syncOnCellular: Bool = false   // Default: sync only on Wi-Fi
     var launchAtLogin: Bool = false
     var autoStartRecording: Bool = false
+    var notesLanguage: String = "en"      // Global default for enhanced notes language
 }
 
 // MARK: - Project Folder

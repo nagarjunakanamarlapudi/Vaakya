@@ -19,6 +19,8 @@ enum SettingsKey {
     static let autoDetectMeetings = "vaakya_auto_detect_meetings"
     static let captureSystemAudio = "vaakya_capture_system_audio"
     static let diarizationBackend = "vaakya_diarization_backend"
+    static let transcriptionLanguage = "vaakya_transcription_language"
+    static let notesLanguage = "vaakya_notes_language"
 }
 
 enum DiarizationBackendOption: String, CaseIterable, Identifiable {
@@ -27,6 +29,40 @@ enum DiarizationBackendOption: String, CaseIterable, Identifiable {
     case energy = "Energy-based (Fast)"
 
     var id: String { rawValue }
+}
+
+enum TranscriptionLanguage: String, CaseIterable, Identifiable {
+    case auto = "auto"
+    case english = "en"
+    case hindi = "hi"
+    case telugu = "te"
+    case tamil = "ta"
+    case kannada = "kn"
+
+    var id: String { rawValue }
+    var code: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .auto: return "Auto-detect"
+        case .english: return "English"
+        case .hindi: return "Hindi"
+        case .telugu: return "Telugu"
+        case .tamil: return "Tamil"
+        case .kannada: return "Kannada"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .auto: return "Detect language automatically"
+        case .english: return "American, British, Indian English"
+        case .hindi: return "हिन्दी"
+        case .telugu: return "తెలుగు"
+        case .tamil: return "தமிழ்"
+        case .kannada: return "ಕನ್ನಡ"
+        }
+    }
 }
 
 enum AIProvider: String, CaseIterable, Identifiable {
@@ -110,6 +146,8 @@ struct SettingsView: View {
     @State private var modelManager = ModelManager()
     @State private var isLoadingModels: Bool = false
     @State private var diarizationBackend: DiarizationBackendOption
+    @State private var transcriptionLanguage: String
+    @State private var notesLanguage: String
     @State private var showDeleteConfirm: Bool = false
     @State private var showManageDownloads: Bool = false
 
@@ -131,6 +169,8 @@ struct SettingsView: View {
         _captureSystemAudio = State(initialValue: defaults.bool(forKey: SettingsKey.captureSystemAudio))
         let backendRaw = defaults.string(forKey: SettingsKey.diarizationBackend) ?? DiarizationBackendOption.speakerKit.rawValue
         _diarizationBackend = State(initialValue: DiarizationBackendOption(rawValue: backendRaw) ?? .speakerKit)
+        _transcriptionLanguage = State(initialValue: defaults.string(forKey: SettingsKey.transcriptionLanguage) ?? "auto")
+        _notesLanguage = State(initialValue: defaults.string(forKey: SettingsKey.notesLanguage) ?? "en")
     }
 
     var body: some View {
@@ -316,6 +356,24 @@ struct SettingsView: View {
             .padding(.vertical, DesignTokens.Spacing.space2)
         }
 
+        sectionLabel("Transcription Language")
+        settingsCard {
+            ForEach(TranscriptionLanguage.allCases) { lang in
+                radioRow(
+                    title: lang.displayName,
+                    subtitle: lang.subtitle,
+                    isSelected: transcriptionLanguage == lang.code,
+                    isRecommended: lang == .auto
+                ) {
+                    transcriptionLanguage = lang.code
+                    UserDefaults.standard.set(lang.code, forKey: SettingsKey.transcriptionLanguage)
+                }
+                if lang != TranscriptionLanguage.allCases.last {
+                    Divider().opacity(0.3).padding(.horizontal, DesignTokens.Spacing.space4)
+                }
+            }
+        }
+
         sectionLabel("Speaker Identification")
         settingsCard {
             ForEach(Array(diarizationOptions.enumerated()), id: \.element.option) { index, item in
@@ -492,6 +550,27 @@ struct SettingsView: View {
             }
             .padding(.horizontal, DesignTokens.Block.padding)
             .padding(.vertical, DesignTokens.Spacing.space3)
+        }
+
+        sectionLabel("Notes Language")
+        settingsCard {
+            ForEach(TranscriptionLanguage.allCases.filter { $0 != .auto }, id: \.self) { lang in
+                radioRow(
+                    title: lang.displayName,
+                    subtitle: lang.subtitle,
+                    isSelected: notesLanguage == lang.code,
+                    isRecommended: lang == .english
+                ) {
+                    notesLanguage = lang.code
+                    UserDefaults.standard.set(lang.code, forKey: SettingsKey.notesLanguage)
+                    var settings = LocalStore.shared.loadSettings()
+                    settings.notesLanguage = lang.code
+                    LocalStore.shared.saveSettings(settings)
+                }
+                if lang != TranscriptionLanguage.allCases.filter({ $0 != .auto }).last {
+                    Divider().opacity(0.3).padding(.horizontal, DesignTokens.Spacing.space4)
+                }
+            }
         }
     }
 
@@ -945,7 +1024,7 @@ struct SettingsView: View {
     }
 
     private func saveSettingsToFile() {
-        let localSettings = LocalSettings(
+        var localSettings = LocalSettings(
             aiProvider: aiProvider.apiValue,
             ollamaURL: ollamaURL,
             ollamaModel: ollamaModel,
@@ -955,6 +1034,7 @@ struct SettingsView: View {
             launchAtLogin: launchAtLogin,
             autoStartRecording: autoStartRecording
         )
+        localSettings.notesLanguage = notesLanguage
         LocalStore.shared.saveSettings(localSettings)
     }
 

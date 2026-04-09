@@ -254,13 +254,16 @@ final class MeetingViewModel {
 
     // MARK: - AI Enhancement (via AIService)
 
-    func enhanceMeeting(meetingId: String, template: String? = nil, userNotes: String = "") async {
-        guard let doc = LocalStore.shared.loadMeeting(id: meetingId) else {
+    var isTranslating = false
+
+    func enhanceMeeting(meetingId: String, template: String? = nil, userNotes: String = "", language: String? = nil) async {
+        guard var doc = LocalStore.shared.loadMeeting(id: meetingId) else {
             errorMessage = "Meeting not found"
             return
         }
         let settings = LocalStore.shared.loadSettings()
         let tmpl = template ?? settings.defaultTemplate
+        let lang = language ?? settings.notesLanguage
         isLoadingBlocks = true
 
         do {
@@ -268,14 +271,15 @@ final class MeetingViewModel {
                 transcript: doc.transcript,
                 userNotes: userNotes.isEmpty ? doc.userNotes : userNotes,
                 template: tmpl,
-                settings: settings
+                settings: settings,
+                language: lang
             )
-            // Save blocks into the document
-            var updated = doc
-            updated.blocks = enhancedBlocks
-            updated.isEnhanced = true
-            updated.aiProvider = settings.aiProvider
-            LocalStore.shared.updateMeeting(updated)
+            doc.enhancedBlocks[lang] = enhancedBlocks
+            doc.blocks = enhancedBlocks  // keep legacy field in sync
+            doc.isEnhanced = true
+            doc.notesLanguage = lang
+            doc.aiProvider = settings.aiProvider
+            LocalStore.shared.updateMeeting(doc)
             selectedMeeting = LocalStore.shared.loadMeeting(id: meetingId)
 
             // Auto-sync to cloud if signed in
@@ -294,6 +298,33 @@ final class MeetingViewModel {
         }
 
         isLoadingBlocks = false
+    }
+
+    func translateTranscript(meetingId: String, targetLanguage: String, force: Bool = false) async {
+        guard var doc = LocalStore.shared.loadMeeting(id: meetingId) else {
+            errorMessage = "Meeting not found"
+            return
+        }
+
+        if !force && doc.translatedTranscripts[targetLanguage] != nil { return }
+
+        let settings = LocalStore.shared.loadSettings()
+        isTranslating = true
+
+        do {
+            let translated = try await AIService.shared.translateTranscript(
+                transcript: doc.transcript,
+                targetLanguage: targetLanguage,
+                settings: settings
+            )
+            doc.translatedTranscripts[targetLanguage] = translated
+            LocalStore.shared.updateMeeting(doc)
+            selectedMeeting = LocalStore.shared.loadMeeting(id: meetingId)
+        } catch {
+            errorMessage = "Translation failed: \(error.localizedDescription)"
+        }
+
+        isTranslating = false
     }
 
     // MARK: - Share (requires sign-in, uses APIClient)

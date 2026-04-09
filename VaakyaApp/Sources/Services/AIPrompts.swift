@@ -3,15 +3,17 @@ import Foundation
 
 enum AIPrompts {
 
-    static func enhancePrompt(transcript: String, userNotes: String, template: String) -> String {
-        """
+    static func enhancePrompt(transcript: String, userNotes: String, template: String, language: String) -> String {
+        let languageName = TranscriptionLanguage(rawValue: language)?.displayName ?? "English"
+        return """
         You are a meeting notes assistant. Analyze this meeting transcript and produce structured notes.
+        Produce all notes in \(languageName).
 
         IMPORTANT: You MUST respond with ONLY a valid JSON array. No code, no explanations, no markdown.
 
         Each element in the array must have these fields:
         - "type": "summary" or "decision" or "action" or "quote"
-        - "content": a clear sentence describing what was said or decided
+        - "content": a clear sentence describing what was said or decided (in \(languageName))
         - "speaker": the person's name (use null for summary)
         - "timestamp_seconds": null
         - "meta_text": null
@@ -36,13 +38,15 @@ enum AIPrompts {
 
         Template style: \(template)
 
-        Respond with ONLY the JSON array. Nothing else.
+        Respond with ONLY the JSON array in \(languageName). Nothing else.
         """
     }
 
-    static func chatPrompt(transcript: String, message: String) -> String {
-        """
+    static func chatPrompt(transcript: String, message: String, language: String) -> String {
+        let languageName = TranscriptionLanguage(rawValue: language)?.displayName ?? "English"
+        return """
         You are a meeting notes assistant. The user is asking a question about a meeting transcript.
+        Respond in \(languageName).
 
         <transcript>
         \(transcript)
@@ -53,7 +57,30 @@ enum AIPrompts {
         </user_question>
 
         Provide a clear, concise answer based only on the transcript. If the answer is not in the transcript, say so.
-        Respond in plain text, not JSON.
+        Respond in \(languageName). Respond in plain text, not JSON.
+        """
+    }
+
+    static func translatePrompt(transcript: String, language: String) -> String {
+        let languageName = TranscriptionLanguage(rawValue: language)?.displayName ?? "English"
+        return """
+        Translate this meeting transcript to \(languageName).
+        Preserve speaker labels and timestamps exactly as they appear.
+        Do NOT summarize or modify content — translate each segment verbatim.
+
+        IMPORTANT: You MUST respond with ONLY a valid JSON array. No explanations, no markdown.
+
+        Each element must have these fields:
+        - "start": the timestamp in seconds (number)
+        - "end": the end timestamp in seconds (number)
+        - "text": the translated text
+        - "speaker": the speaker label (keep unchanged)
+
+        <transcript>
+        \(transcript)
+        </transcript>
+
+        Respond with ONLY the JSON array. Nothing else.
         """
     }
 }
