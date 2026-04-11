@@ -29,7 +29,8 @@ endef
 # ============================================================
 # Xcode Project Generation
 # ============================================================
-DERIVED_DATA = DerivedData
+ENV         ?= dev
+DERIVED_DATA = DerivedData/$(ENV)
 APP_PATH     = $(DERIVED_DATA)/Build/Products/Debug/Vaakya.app
 APP_BINARY   = $(APP_PATH)/Contents/MacOS/Vaakya
 
@@ -54,9 +55,10 @@ build: generate ## Build macOS app via Xcode
 # ============================================================
 run: ## Run in dev mode (localhost API)
 	$(call GENERATE_CONFIG,dev,$(API_URL_DEV))
-	@$(MAKE) build
+	@$(MAKE) build ENV=dev
 	@open $(APP_PATH)
 
+run-stg: ENV = stg
 run-stg: ## Run against staging AWS (URL fetched from Terraform)
 	$(eval API_URL_STG := $(shell cd $(TF_DIR) && AWS_PROFILE=$(AWS_PROFILE) terraform init -reconfigure -backend-config="key=infra/stg/terraform.tfstate" -backend-config="profile=$(AWS_PROFILE)" > /dev/null 2>&1 && terraform output -raw api_url 2>/dev/null || echo "NOT_DEPLOYED"))
 	@if [ "$(API_URL_STG)" = "NOT_DEPLOYED" ]; then \
@@ -65,9 +67,10 @@ run-stg: ## Run against staging AWS (URL fetched from Terraform)
 	fi
 	@echo "Staging API: $(API_URL_STG)"
 	$(call GENERATE_CONFIG,stg,$(API_URL_STG))
-	@$(MAKE) build
+	@$(MAKE) build ENV=stg
 	@open $(APP_PATH)
 
+run-prod: ENV = prod
 run-prod: ## Run against production AWS (URL fetched from Terraform)
 	$(eval API_URL_PROD := $(shell cd $(TF_DIR) && AWS_PROFILE=$(AWS_PROFILE) terraform init -reconfigure -backend-config="key=infra/prod/terraform.tfstate" -backend-config="profile=$(AWS_PROFILE)" > /dev/null 2>&1 && terraform output -raw api_url 2>/dev/null || echo "NOT_DEPLOYED"))
 	@if [ "$(API_URL_PROD)" = "NOT_DEPLOYED" ]; then \
@@ -76,7 +79,7 @@ run-prod: ## Run against production AWS (URL fetched from Terraform)
 	fi
 	@echo "Production API: $(API_URL_PROD)"
 	$(call GENERATE_CONFIG,prod,$(API_URL_PROD))
-	@$(MAKE) build
+	@$(MAKE) build ENV=prod
 	@open $(APP_PATH)
 
 fresh: clean run ## Clean build + run (dev)
@@ -86,14 +89,15 @@ fresh: clean run ## Clean build + run (dev)
 # ============================================================
 dev: ## Run from terminal with logs (dev)
 	$(call GENERATE_CONFIG,dev,$(API_URL_DEV))
-	@$(MAKE) build
+	@$(MAKE) build ENV=dev
 	$(APP_BINARY)
 
+dev-stg: ENV = stg
 dev-stg: ## Run from terminal with logs (stg)
 	$(eval API_URL_STG := $(shell cd $(TF_DIR) && AWS_PROFILE=$(AWS_PROFILE) terraform init -reconfigure -backend-config="key=infra/stg/terraform.tfstate" -backend-config="profile=$(AWS_PROFILE)" > /dev/null 2>&1 && terraform output -raw api_url 2>/dev/null))
 	@echo "Staging API: $(API_URL_STG)"
 	$(call GENERATE_CONFIG,stg,$(API_URL_STG))
-	@$(MAKE) build
+	@$(MAKE) build ENV=stg
 	$(APP_BINARY)
 
 # ============================================================
@@ -124,4 +128,4 @@ archive: generate ## Archive for TestFlight (requires Xcode signing setup first)
 # Clean
 # ============================================================
 clean:
-	rm -rf $(DERIVED_DATA) Vaakya.xcodeproj build/
+	rm -rf DerivedData Vaakya.xcodeproj build/

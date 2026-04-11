@@ -104,9 +104,13 @@ final class SyncService {
                 subdirectoryPrefix: "meetings"
             )
 
-            // 3. Pull meetings that are remote-newer or new-on-server
+            // 3. Pull meetings that are remote-newer or new-on-server (skip failures)
             for id in result.pulled {
-                try await pullMeeting(id: id)
+                do {
+                    try await pullMeeting(id: id)
+                } catch {
+                    print("[SyncService] Skipping meeting \(id): \(error.localizedDescription)")
+                }
             }
 
             // 4. Push updated index only if something changed
@@ -185,6 +189,12 @@ final class SyncService {
     }
 
     // MARK: - Pull
+
+    /// On-demand audio download for a synced meeting.
+    func pullAudio(meetingId: String) async throws {
+        try await fileSync.pull(keys: ["meetings/\(meetingId)/audio.m4a"])
+        print("[SyncService] Pulled audio for meeting \(meetingId)")
+    }
 
     private func pullMeeting(id: String) async throws {
         let data = try await fileSync.pullData(key: "meetings/\(id)/meeting.json")

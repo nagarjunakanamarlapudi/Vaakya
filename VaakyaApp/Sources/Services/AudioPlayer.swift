@@ -37,6 +37,8 @@ final class AudioPlayer: NSObject {
         player?.rate = speed
     }
 
+    var isDownloadingAudio = false
+
     func loadForMeeting(meetingId: String) {
         // Primary: LocalStore meeting directory
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -55,16 +57,30 @@ final class AudioPlayer: NSObject {
         let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Vaakya/recordings")
         #endif
-        guard let files = try? FileManager.default.contentsOfDirectory(
+        if let files = try? FileManager.default.contentsOfDirectory(
             at: dir, includingPropertiesForKeys: nil
-        ) else { return }
+        ) {
+            let matching = files
+                .filter { $0.lastPathComponent.hasPrefix(meetingId) && $0.pathExtension == "m4a" }
+                .sorted { $0.lastPathComponent > $1.lastPathComponent }
+            if let latest = matching.first {
+                load(url: latest)
+                return
+            }
+        }
 
-        let matching = files
-            .filter { $0.lastPathComponent.hasPrefix(meetingId) && $0.pathExtension == "m4a" }
-            .sorted { $0.lastPathComponent > $1.lastPathComponent }
-
-        if let latest = matching.first {
-            load(url: latest)
+        // On-demand: fetch from S3 via SyncService
+        isDownloadingAudio = true
+        Task {
+            do {
+                try await SyncService.shared.pullAudio(meetingId: meetingId)
+                if FileManager.default.fileExists(atPath: localStoreAudio.path) {
+                    load(url: localStoreAudio)
+                }
+            } catch {
+                print("AudioPlayer: remote audio fetch failed for \(meetingId): \(error)")
+            }
+            isDownloadingAudio = false
         }
     }
 

@@ -53,19 +53,25 @@ struct TranscriptView: View {
             // Audio Player
             VStack(spacing: DesignTokens.Spacing.space2) {
                 HStack(spacing: DesignTokens.Spacing.space3) {
-                    Button(action: { audioPlayer.toggle() }) {
-                        Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(audioPlayer.duration > 0 ? Color.textPrimary : Color.textTertiary)
+                    if audioPlayer.isDownloadingAudio {
+                        ProgressView()
+                            .controlSize(.small)
                             .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill(Color.bgCard)
-                                    .shadow(color: DesignTokens.Shadow.cardColor, radius: 2, y: 1)
-                            )
+                    } else {
+                        Button(action: { audioPlayer.toggle() }) {
+                            Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(audioPlayer.duration > 0 ? Color.textPrimary : Color.textTertiary)
+                                .frame(width: 32, height: 32)
+                                .background(
+                                    Circle()
+                                        .fill(Color.bgCard)
+                                        .shadow(color: DesignTokens.Shadow.cardColor, radius: 2, y: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(audioPlayer.duration == 0)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(audioPlayer.duration == 0)
 
                     // Progress bar
                     GeometryReader { geo in
@@ -87,11 +93,17 @@ struct TranscriptView: View {
                     }
                     .frame(height: 32)
 
-                    Text(audioPlayer.duration > 0
-                         ? "\(audioPlayer.formattedCurrentTime) / \(audioPlayer.formattedDuration)"
-                         : "No audio")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(Color.textTertiary)
+                    if audioPlayer.isDownloadingAudio {
+                        Text("Downloading audio...")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(Color.textTertiary)
+                    } else {
+                        Text(audioPlayer.duration > 0
+                             ? "\(audioPlayer.formattedCurrentTime) / \(audioPlayer.formattedDuration)"
+                             : "No audio")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(Color.textTertiary)
+                    }
                 }
 
                 // Speed controls
