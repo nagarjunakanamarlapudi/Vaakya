@@ -55,7 +55,7 @@ app-dev-stg:                     ## Run app from terminal with logs (AWS staging
 	cd VaakyaApp && $(MAKE) dev-stg
 
 app-build:                       ## Build app only
-	cd VaakyaApp && swift build
+	cd VaakyaApp && $(MAKE) build
 
 app-clean:                       ## Clean app build
 	cd VaakyaApp && $(MAKE) clean

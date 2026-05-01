@@ -37,10 +37,16 @@ APP_BINARY   = $(APP_PATH)/Contents/MacOS/Vaakya
 generate: ## Regenerate Xcode project from project.yml
 	xcodegen generate --spec project.yml
 
+# Generate dev BuildConfig if missing. Callers (run-stg/run-prod) pre-generate
+# with their own URLs before invoking build, so this only triggers for first-time
+# standalone `make build` invocations.
+Sources/Config/BuildConfig.swift:
+	$(call GENERATE_CONFIG,dev,$(API_URL_DEV))
+
 # ============================================================
 # Build (xcodebuild)
 # ============================================================
-build: generate ## Build macOS app via Xcode
+build: Sources/Config/BuildConfig.swift generate ## Build macOS app via Xcode
 	xcodebuild build \
 		-project Vaakya.xcodeproj \
 		-scheme Vaakya_macOS \
