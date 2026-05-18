@@ -2,6 +2,11 @@
 # Vaakya — Make Commands
 # ============================================================
 #
+# Setup (first-time):
+#   make doctor               Check developer environment
+#   make setup                Install project dependencies (brew + uv sync)
+#   make bootstrap            doctor + setup + uv sync
+#
 # App (Swift macOS/iOS):
 #   make app-run              Run app → talks to local backend
 #   make app-run-stg          Run app → talks to AWS staging
@@ -34,6 +39,18 @@
 TF_DIR = infra
 AWS_PROFILE ?= vaakya-dev
 AWS_REGION ?= us-east-1
+
+# ============================================================
+# Setup / Doctor (first-time developer environment)
+# ============================================================
+
+doctor:                          ## Check developer environment
+	@./scripts/doctor.sh
+
+setup:                           ## Install project dependencies (brew + uv sync)
+	@./scripts/setup.sh
+
+bootstrap: setup doctor          ## First-time setup + verify
 
 # ============================================================
 # App (Swift)
@@ -224,6 +241,12 @@ help:
 	@echo ""
 	@echo "  All commands: make <command>"
 	@echo "  Quick start:  make app-fresh  (no server needed)"
+	@echo ""
+	@echo "  🚀 SETUP (first-time)"
+	@echo "  ────────────────────────────────────────────────────────────────────"
+	@echo "  Check environment        doctor"
+	@echo "  Install dependencies     setup"
+	@echo "  Bootstrap (setup+doctor) bootstrap"
 	@echo ""
 	@echo "  🖥️  APP (Swift macOS/iOS)"
 	@echo "  ────────────────────────────────────────────────────────────────────"
