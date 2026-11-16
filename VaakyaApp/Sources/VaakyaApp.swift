@@ -12,6 +12,7 @@ extension Notification.Name {
     static let enhanceMeeting = Notification.Name("enhanceMeeting")
     static let newMeeting = Notification.Name("newMeeting")
     static let startRecording = Notification.Name("startRecording")
+    static let stopRecording = Notification.Name("stopRecording")
 }
 
 // MARK: - macOS App Delegate
@@ -103,9 +104,10 @@ struct VaakyaApp: App {
     @State private var loadingModelName = ""
 
     #if os(macOS)
-    @State private var menuBarRecorder = AudioRecorder()
+    private let menuBarRecorder = AudioRecorder.shared
     @State private var calendarVM = CalendarViewModel()
     @State private var menuBarMeetingVM = MeetingViewModel()
+    @State private var notchController: NotchIndicatorController?
     #endif
 
     var body: some Scene {
@@ -195,6 +197,13 @@ struct VaakyaApp: App {
                 try? await Task.sleep(nanoseconds: 300_000_000) // Brief pause at 100%
                 withAnimation(.easeOut(duration: 0.3)) {
                     appReady = true
+                }
+
+                // Install the notch indicator now that the app is ready.
+                if notchController == nil {
+                    let c = NotchIndicatorController(recorder: menuBarRecorder)
+                    c.install()
+                    notchController = c
                 }
             }
         }

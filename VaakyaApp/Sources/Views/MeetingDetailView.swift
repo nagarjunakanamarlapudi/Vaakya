@@ -439,6 +439,10 @@ struct MeetingDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: .toggleFloatingPanel)) { _ in
             toggleFloatingPanel()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .stopRecording)) { _ in
+            guard recorder.isRecording else { return }
+            stopRecordingFlow()
+        }
         .sheet(isPresented: $showSpeakerMatching) {
             SpeakerMatchingView(
                 speakers: diarizationSpeakers,
@@ -590,6 +594,8 @@ struct MeetingDetailView: View {
     private var session: RecordingSession { RecordingSession.shared }
 
     private func showFloatingPanel() {
+        // The notch indicator only shows recording status. This notepad is where Quick Notes
+        // are typed — stopRecordingFlow() passes session.notes to enhanceMeeting.
         guard let meeting = meetingVM.selectedMeeting else { return }
         session.start(meetingId: meeting.id, title: meeting.title)
         let notepadView = FloatingNotepad(

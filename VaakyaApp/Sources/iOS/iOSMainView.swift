@@ -8,7 +8,7 @@ struct iOSMainView: View {
     @Environment(AuthViewModel.self) private var auth
     @Environment(ThemeManager.self) private var themeManager
     @State private var meetingVM = MeetingViewModel()
-    @State private var recorder = AudioRecorder()
+    private let recorder = AudioRecorder.shared
     @State private var calendarVM = CalendarViewModel()
     @State private var audioDeviceManager = AudioDeviceManagerIOS()
     @State private var showSettings = false

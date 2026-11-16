@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Vaakya — Notch Indicator Mocks</title>
+<style>
+  :root {
+    --bg: #0b0b0c;
+    --bg-card: #141416;
+    --bg-card-2: #1a1a1d;
+    --border: #2a2a2e;
+    --text: #f2f2f4;
+    --text-dim: #8e8e93;
+    --text-mute: #6b6b6f;
+    --accent: #34a853;
+    --rec: #ff3b30;
+    --rec-glow: rgba(255, 59, 48, 0.55);
+    --menu-bar-h: 28px;
+    --notch-w: 180px;
+    --notch-h: 30px;
+    --frame-h: 220px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 50% -100px, #1b1f1b 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+    font-feature-settings: "ss01", "tnum";
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    padding: 56px 32px 96px;
+  }
+  header {
+    max-width: 1200px;
+    margin: 0 auto 40px;
+  }
+  .eyebrow {
+    color: var(--accent);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  h1 {
+    font-size: 36px;
+    line-height: 1.1;
+    margin: 8px 0 12px;
+    letter-spacing: -0.02em;
+  }
+  h1 .light { color: var(--text-dim); font-weight: 500; }
+  header p {
+    color: var(--text-dim);
+    max-width: 680px;
+    line-height: 1.5;
+    margin: 0;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: border-color .2s ease, transform .2s ease;
+  }
+  .card:hover { border-color: #3a3a40; }
+  .card .frame {
+    position: relative;
+    background:
+      linear-gradient(180deg, #2a2a2e 0%, #1f1f23 var(--menu-bar-h), #0f0f12 calc(var(--menu-bar-h) + 1px), #0f0f12 100%);
+    height: var(--frame-h);
+    overflow: hidden;
+  }
+  /* Menu bar */
+  .menu-bar {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: var(--menu-bar-h);
+    display: flex; align-items: center;
+    padding: 0 12px;
+    font-size: 12px; color: rgba(255,255,255,0.85);
+    backdrop-filter: blur(8px);
+  }
+  .menu-bar .apple { font-size: 14px; margin-right: 14px; opacity: 0.9; }
+  .menu-bar .menu-item { margin-right: 14px; opacity: 0.85; }
+  .menu-bar .menu-item.bold { font-weight: 600; opacity: 1; }
+  .menu-bar .right {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 10px;
+    opacity: 0.8;
+  }
+  .menu-bar .right .menubar-icon { font-size: 13px; }
+  /* Notch */
+  .notch {
+    position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: var(--notch-w); height: var(--notch-h);
+    background: #000;
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
+    z-index: 4;
+  }
+  /* Pill (the actual indicator) */
+  .pill {
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    height: var(--notch-h);
+    min-width: var(--notch-w);
+    background: #000;
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px;
+    padding: 0 16px;
+    color: #fff;
+    z-index: 5;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+    transition: width .35s cubic-bezier(.2,.7,.2,1), opacity .25s ease;
+  }
+  .pill.notch-mode { /* anchored under physical notch on notched displays */ }
+  .pill.floating  { /* free position on non-notch displays */ top: 4px; }
+  .pill.invisible { opacity: 0; pointer-events: none; }
+  .pill.dim       { opacity: 0.55; }
+  .pill.collapsed {
+    /* Visually merges with the notch — same width, no content visible */
+    min-width: var(--notch-w);
+    width: var(--notch-w);
+  }
+  .pill.collapsed .pill-content { opacity: 0; }
+  .pill.expanded {
+    min-width: 280px;
+    width: 280px;
+  }
+  .pill-content {
+    display: flex; align-items: center; gap: 12px;
+    transition: opacity .2s ease;
+  }
+  .rec-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--rec);
+    box-shadow: 0 0 8px var(--rec-glow);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  .rec-dot.greyed {
+    background: #5a5a5e;
+    box-shadow: none;
+    animation: none;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1);   box-shadow: 0 0 8px var(--rec-glow); }
+    50%      { transform: scale(0.85); box-shadow: 0 0 14px var(--rec-glow); }
+  }
+  .duration {
+    font-variant-numeric: tabular-nums;
+    font-size: 13px; font-weight: 500;
+    letter-spacing: 0.02em;
+    color: #fff;
+  }
+  /* Waveform — 6 bars */
+  .waveform {
+    display: flex; align-items: center; gap: 3px;
+    height: 16px;
+  }
+  .waveform .bar {
+    width: 3px;
+    background: linear-gradient(180deg, #fff 0%, #cfd2d6 100%);
+    border-radius: 1.5px;
+    animation: wave 0.9s ease-in-out infinite;
+  }
+  .waveform .bar:nth-child(1) { animation-delay: -0.1s; }
+  .waveform .bar:nth-child(2) { animation-delay: -0.3s; }
+  .waveform .bar:nth-child(3) { animation-delay: -0.5s; }
+  .waveform .bar:nth-child(4) { animation-delay: -0.2s; }
+  .waveform .bar:nth-child(5) { animation-delay: -0.4s; }
+  .waveform .bar:nth-child(6) { animation-delay: -0.6s; }
+  @keyframes wave {
+    0%, 100% { height: 4px;  }
+    50%      { height: 14px; }
+  }
+  /* Card meta */
+  .meta {
+    padding: 16px 18px 18px;
+    border-top: 1px solid var(--border);
+  }
+  .meta .label {
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .meta .name {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
+  }
+  .meta .desc {
+    font-size: 13px; line-height: 1.45;
+    color: var(--text-dim);
+  }
+  .meta .desc code {
+    background: #232328; padding: 1px 6px; border-radius: 4px;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: #d5d7da;
+  }
+  /* Annotations inside frame */
+  .annotation {
+    position: absolute;
+    bottom: 12px; left: 12px; right: 12px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px;
+    color: var(--text-mute);
+    letter-spacing: 0.02em;
+  }
+  .annotation .dot-mark {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--text-mute);
+  }
+  .annotation.success .dot-mark { background: var(--accent); }
+  .annotation.warn    .dot-mark { background: #ff9f0a; }
+  /* Drag affordance: cursor + ghost path */
+  .drag-arrow {
+    position: absolute;
+    top: 8px; left: 50%; transform: translateX(-50%) translateX(60px);
+    width: 80px; height: 22px;
+    pointer-events: none;
+    opacity: 0.8;
+  }
+  .drag-arrow svg { width: 100%; height: 100%; }
+  .cursor-grab {
+    position: absolute;
+    top: 12px; left: 50%; transform: translateX(36px);
+    font-size: 18px;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+  }
+  /* Lifecycle diagram */
+  .lifecycle {
+    max-width: 1200px;
+    margin: 56px auto 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+  }
+  .lifecycle h2 {
+    font-size: 14px; letter-spacing: 0.14em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin: 0 0 18px;
+    font-weight: 700;
+  }
+  .timeline {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+  }
+  .step {
+    background: var(--bg-card-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .step .t { font-size: 11px; color: var(--text-mute); letter-spacing: 0.08em; text-transform: uppercase; }
+  .step .n { font-size: 13px; font-weight: 600; margin-top: 4px; }
+  .step .d { font-size: 12px; color: var(--text-dim); margin-top: 4px; line-height: 1.4; }
+  /* Section heads */
+  .section-head {
+    max-width: 1200px;
+    margin: 56px auto 16px;
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  .section-head h2 {
+    font-size: 22px;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .section-head .sub {
+    color: var(--text-mute);
+    font-size: 13px;
+  }
+  /* Hover-to-play */
+  .card .pill { animation-play-state: paused; }
+  .card.auto-play .pill { animation-play-state: running; }
+  .card[data-anim="expand"]:hover .pill { animation: expandIn 1.4s ease forwards; }
+  @keyframes expandIn {
+    0%   { min-width: var(--notch-w); width: var(--notch-w); }
+    30%  { min-width: 280px; width: 280px; }
+    100% { min-width: 280px; width: 280px; }
+  }
+  .card[data-anim="expand"]:hover .pill-content { opacity: 1; transition: opacity .25s ease .15s; }
+  /* Footer */
+  footer {
+    max-width: 1200px;
+    margin: 64px auto 0;
+    color: var(--text-mute);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  footer code {
+    background: #232328; padding: 1px 6px; border-radius: 4px;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 11px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Vaakya · Mac · Notch Indicator</div>
+  <h1>Recording status, in the notch <span class="light">— all states</span></h1>
+  <p>
+    A Dynamic Island-style pill anchored to the notch (or a draggable floating pill on non-notch Macs).
+    Expands briefly on recording start, every 60s heartbeat, and on hover. Otherwise fully retracts.
+    Hover any card below to play its animation.
+  </p>
+</header>
+
+<!-- ====================== Notched Macs ====================== -->
+<div class="section-head">
+  <h2>Notched MacBook Pro (14"/16")</h2>
+  <span class="sub">Anchored to the physical notch · not draggable</span>
+</div>
+
+<div class="grid">
+
+  <!-- 1. Hidden / Idle -->
+  <div class="card">
+    <div class="frame">
+      <div class="menu-bar">
+        <span class="apple"></span>
+        <span class="menu-item bold">Vaakya</span>
+        <span class="menu-item">File</span>
+        <span class="menu-item">Edit</span>
+        <span class="menu-item">View</span>
+        <div class="right">
+          <span class="menubar-icon"></span>
+          <span class="menubar-icon">100%</span>
+          <span class="menubar-icon">Thu 22:14</span>
+        </div>
+      </div>
+      <div class="notch"></div>
+      <div class="annotation"><span class="dot-mark"></span>Nothing rendered. Notch is its own bare self.</div>
+    </div>
+    <div class="meta">
+      <div class="label">State 1</div>
+      <div class="name">Hidden · not recording</div>
+      <div class="desc">Default state. Indicator is fully invisible and consumes no screen real estate. Mouse events pass through.</div>
+    </div>
+  </div>
+
+  <!-- 2. Expanded on recording start -->
+  <div class="card" data-anim="expand">
+    <div class="frame">
+      <div class="menu-bar">
+        <span class="apple"></span>
+        <span class="menu-item bold">Vaakya</span>
+        <span class="menu-item">File</span>
+        <span class="menu-item">Edit</span>
+        <div class="right">
+          <span class="menubar-icon">Thu 22:14</span>
+        </div>
+      </div>
+      <div class="pill expanded notch-mode">
+        <div class="pill-content">
+          <div class="rec-dot"></div>
+          <div class="duration">00:00</div>
+          <div class="waveform">
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          </div>
+        </div>
+      </div>
+      <div class="annotation success"><span class="dot-mark"></span>Pill grows from notch · holds 1.5s · then fully retracts</div>
+    </div>
+    <div class="meta">
+      <div class="label">State 2</div>
+      <div class="name">Expanded — recording start</div>
+      <div class="desc">Triggered the moment recording begins. Shows the red pulsing dot, elapsed time <code>00:00</code>, and live mic waveform. Auto-retracts after 1.5s.</div>
+    </div>
+  </div>
+
+  <!-- 3. Retracted (recording ongoing) -->
+  <div class="card">
+    <div class="frame">
+      <div class="menu-bar">
+        <span class="apple"></span>
+        <span class="menu-item bold">Vaakya</span>
+        <span class="menu-item">File</span>
+        <span class="menu-item">Edit</span>
+        <div class="right">
+          <span class="menubar-icon">Thu 22:15</span>
+        </div>
+      </div>
+      <div class="notch"></div>
+      <div class="annotation warn"><span class="dot-mark"></span>Recording is live · indicator visually merged with notch</div>
+    </div>
+    <div class="meta">
+      <div class="label">State 3</div>
+      <div class="name">Retracted — recording (resting)</div>
+      <div class="desc">The pill has fully collapsed back into the notch. Visually identical to State 1, but the heartbeat timer is running. Existing MenuBarExtra icon still reflects state.</div>
+    </div>
+  </div>
+
+  <!-- 4. Expanded heartbeat -->
+  <div class="card" data-anim="expand">
+    <div class="frame">
+      <div class="menu-bar">
+        <span class="apple"></span>
+        <span class="menu-item bold">Vaakya</span>
+        <span class="menu-item">File</span>
+        <span class="menu-item">Edit</span>
+        <div class="right">
+          <span class="menubar-icon">Thu 22:18</span>
+        </div>
+      </div>
+      <div class="pill expanded notch-mode">
+        <div class="pill-content">
+          <div class="rec-dot"></div>
+          <div class="duration">03:42</div>
+          <div class="waveform">
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          </div>
+        </div>
+      </div>
+      <div class="annotation"><span class="dot-mark"></span>Every 60s · brief 1.5s reappearance · then retracts</div>
+    </div>
+    <div class="meta">
+      <div class="label">State 4</div>
+      <div class="name">Expanded — heartbeat</div>
+      <div class="desc">Identical to State 2 but with the live elapsed time. Fires automatically every 60 seconds while recording so you can't forget.</div>
+    </div>
+  </div>
+
+  <!-- 5. Expanded on hover -->
+  <div class="card" data-anim="expand">
+    <div class="frame">
+      <div class="menu-bar">
+        <span class="apple"></span>
+        <span class="menu-item bold">Vaakya</span>
+        <span class="menu-item">File</span>
+        <span class="menu-item">Edit</span>
+        <div class="right">
+          <span class="menubar-icon">Thu 22:21</span>
+        </div>
+      </div>
+      <div class="pill expanded notch-mode">
+        <div class="pill-content">
+          <div class="rec-dot"></div>
+          <div class="duration">06:18</div>
+          <div class="waveform">
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          </div>
+        </div>
+      </div>
+      <div class="annotation"><span class="dot-mark"></span>Stays expanded while hovered · click anywhere on pill → stop</div>
+    </div>
+    <div class="meta">
+      <div class="label">State 5</div>
+      <div class="name">Expanded — hover (peek + stop)</div>
+      <div class="desc">User hovers over the notch area. Pill expands and <em>stays</em> expanded until the hover ends. Clicking the pill stops the recording (with &lt; 4pt drag-vs-click hysteresis).</div>
+    </div>
+  </div>
+
+  <!-- 6. Stop confirmation -->
+  <div class="card" data-anim="expand">
+    <div class="frame">
+      <div class="menu-bar">
+        <span class="apple"></span>
+        <span class="menu-item bold">Vaakya</span>
+        <span class="menu-item">File</span>
+        <span class="menu-item">Edit</span>
+        <div class="right">
+          <span class="menubar-icon">Thu 22:25</span>
+        </div>
+      </div>
+      <div class="pill expanded notch-mode">
+        <div class="pill-content">
+          <div class="rec-dot greyed"></div>
+          <div class="duration">10:32</div>
+          <div class="waveform">
+            <div class="bar" style="height: 4px; animation: none;"></div>
+            <div class="bar" style="height: 4px; animation: none;"></div>
+            <div class="bar" style="height: 4px; animation: none;"></div>
+            <div class="bar" style="height: 4px; animation: none;"></div>
+            <div class="bar" style="height: 4px; animation: none;"></div>
+            <div class="bar" style="height: 4px; animation: none;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="annotation success"><span class="dot-mark"></span>Final elapsed time · dot greyed · holds 1.0s · then hides</div>
+    </div>
+    <div class="meta">
+      <div class="label">State 6</div>
+      <div class="name">Expanded — stop confirmation</div>
+      <div class="desc">Final length of the recording is shown briefly with a greyed dot and static waveform, giving a clear "saved" beat before the pill retracts and disappears.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ====================== Non-notch Macs ====================== -->
+<div class="section-head">
+  <h2>Non-notch Macs (Air M1, external displays, Mac mini)</h2>
+  <span class="sub">Floating pill · draggable · per-screen position</span>
+</div>
+
+<div class="grid">
+
+  <!-- A. Hidden -->
+  <div class="card">
+    <div class="frame">
+      <div class="menu-bar">
+        <span class="apple"></span>
+        <span class="menu-item bold">Vaakya</span>
+        <span class="menu-item">File</span>
+        <span class="menu-item">Edit</span>
+        <div class="right">
+          <span class="menubar-icon">Thu 22:14</span>
+        </div>
+      </div>
+      <div class="annotation"><span class="dot-mark"></span>No notch · no indicator visible · mouse not near top</div>
+    </div>
+    <div class="meta">
+      <div class="label">State A</div>
+      <div class="name">Hidden · idle</div>
+      <div class="desc">Equivalent to State 1, but no physical notch on the display. Pill is invisible until summoned or recording starts.</div>
+    </div>
+  </div>
+
+  <!-- B. Summoned for positioning -->
+  <div class="card">
+    <div class="frame">
+      <div class="menu-bar">
+        <span class="apple"></span>
+        <span class="menu-item bold">Vaakya</span>
+        <span class="menu-item">File</span>
+        <span class="menu-item">Edit</span>
+        <div class="right">
+          <span class="menubar-icon">Thu 22:14</span>
+        </div>
+      </div>
+      <div class="pill floating dim" style="min-width: var(--notch-w); width: var(--notch-w);"></div>
+      <span class="cursor-grab">✥</span>
+      <div class="annotation success"><span class="dot-mark"></span>Hover near top of screen · pill fades in at 55% · drag to reposition</div>
+    </div>
+    <div class="meta">
+      <div class="label">State B</div>
+      <div class="name">Summoned — drag to position</div>
+      <div class="desc">Mouse near the top edge for &gt;0.3s fades the pill in. While visible, click-and-drag to move it; release within 20pt of center to soft-snap. Position saved per display in <code>UserDefaults</code>.</div>
+    </div>
+  </div>
+
+  <!-- C. Floating expanded (recording start) -->
+  <div class="card" data-anim="expand">
+    <div class="frame">
+      <div class="menu-bar">
+        <span class="apple"></span>
+        <span class="menu-item bold">Vaakya</span>
+        <span class="menu-item">File</span>
+        <span class="menu-item">Edit</span>
+        <div class="right">
+          <span class="menubar-icon">Thu 22:14</span>
+        </div>
+      </div>
+      <div class="pill expanded floating">
+        <div class="pill-content">
+          <div class="rec-dot"></div>
+          <div class="duration">00:00</div>
+          <div class="waveform">
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          </div>
+        </div>
+      </div>
+      <div class="annotation success"><span class="dot-mark"></span>Same animation as notch · floating at saved position</div>
+    </div>
+    <div class="meta">
+      <div class="label">State C</div>
+      <div class="name">Floating — recording start</div>
+      <div class="desc">Same expand animation as State 2, just rendered at the user's saved floating position (defaults to top-center). All recording states behave identically to the notched flow.</div>
+    </div>
+  </div>
+
+  <!-- D. Floating retracted -->
+  <div class="card">
+    <div class="frame">
+      <div class="menu-bar">
+        <span class="apple"></span>
+        <span class="menu-item bold">Vaakya</span>
+        <span class="menu-item">File</span>
+        <span class="menu-item">Edit</span>
+        <div class="right">
+          <span class="menubar-icon">Thu 22:15</span>
+        </div>
+      </div>
+      <div class="pill floating collapsed">
+        <div class="pill-content"><span class="duration">·</span></div>
+      </div>
+      <div class="annotation warn"><span class="dot-mark"></span>Recording live · floating pill collapsed to virtual-notch shape</div>
+    </div>
+    <div class="meta">
+      <div class="label">State D</div>
+      <div class="name">Floating — retracted (recording)</div>
+      <div class="desc">On a non-notch Mac the "fully retract" state still leaves a small black pill silhouette at the saved position — there's no physical notch to hide behind, so we hide behind a virtual one. Hover or heartbeat re-expands it.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ====================== Lifecycle ====================== -->
+<div class="lifecycle">
+  <h2>Lifecycle (single recording session)</h2>
+  <div class="timeline">
+    <div class="step">
+      <div class="t">t = 0s</div>
+      <div class="n">Start</div>
+      <div class="d">Pill grows out of notch · holds 1.5s with red dot + 00:00 + waveform</div>
+    </div>
+    <div class="step">
+      <div class="t">t = 1.5s</div>
+      <div class="n">Retract</div>
+      <div class="d">Pill collapses back into notch · recording continues silently</div>
+    </div>
+    <div class="step">
+      <div class="t">every 60s</div>
+      <div class="n">Heartbeat</div>
+      <div class="d">Brief 1.5s re-expand with current elapsed time</div>
+    </div>
+    <div class="step">
+      <div class="t">on hover</div>
+      <div class="n">Peek</div>
+      <div class="d">Pill expands and stays until hover ends · click → stop</div>
+    </div>
+    <div class="step">
+      <div class="t">stop</div>
+      <div class="n">Confirm</div>
+      <div class="d">Final time + greyed dot · holds 1.0s · hides</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  States visualized: 6 notched + 4 non-notch. Pulse/wave animations are CSS only — the real app drives the
+  red dot from <code>AudioRecorder.isRecording</code>, duration from <code>recordingDuration</code>, and
+  the 6 waveform bars from <code>currentAmplitude</code>. Open in any Chromium/Safari browser.
+</footer>
+
+</body>
+</html>
