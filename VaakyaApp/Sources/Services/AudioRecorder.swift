@@ -9,6 +9,8 @@ import MediaPlayer
 @MainActor
 @Observable
 final class AudioRecorder: NSObject {
+    static let shared = AudioRecorder()
+
     var isRecording: Bool = false
     var recordingDuration: TimeInterval = 0
     var currentAmplitude: Float = 0

@@ -33,6 +33,8 @@ targets:
           - Resources
       - path: Sources/Resources/GoogleService-Info.plist
         buildPhase: resources
+      - path: Sources/Resources/Assets.xcassets
+        buildPhase: resources
     dependencies:
       - package: WhisperKit
         product: WhisperKit
@@ -54,6 +56,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: ai.vaakya.app
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: Sources/Resources/Vaakya.entitlements
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: WBKK5SBPY7

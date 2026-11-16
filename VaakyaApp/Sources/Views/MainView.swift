@@ -4,7 +4,7 @@ import SwiftUI
 struct MainView: View {
     @Environment(AuthViewModel.self) private var auth
     @State private var meetingVM = MeetingViewModel()
-    @State private var recorder = AudioRecorder()
+    private let recorder = AudioRecorder.shared
     @State private var toastManager = ToastManager()
     @State private var sidebarVisibility: NavigationSplitViewVisibility = .automatic
     @State private var calendarVM = CalendarViewModel()

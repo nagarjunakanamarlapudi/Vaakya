@@ -83,6 +83,9 @@ app-test:                        ## Run Swift E2E tests
 app-fresh:                       ## Clean build + run (local backend)
 	cd VaakyaApp && $(MAKE) fresh
 
+app-icon:                        ## Regenerate app icon set from SF Symbol
+	@swift scripts/generate-icon.swift
+
 # ============================================================
 # Backend (Python FastAPI)
 # ============================================================
